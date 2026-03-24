@@ -94,11 +94,13 @@ async function main() {
 
       const headers = msg.data.payload.headers;
       const email = {
+        id: message.id,
         from: getHeader(headers, 'From'),
         to: getHeader(headers, 'To'),
         cc: getHeader(headers, 'Cc'),
         subject: getHeader(headers, 'Subject'),
-        date: getHeader(headers, 'Date')
+        date: getHeader(headers, 'Date'),
+        link: `https://mail.google.com/mail/u/0/#inbox/${message.id}`
       };
 
       emails.push(email);
@@ -206,7 +208,8 @@ function generateDigest(date, internalDirect, internalMulti, externalDirect, ext
     internalDirect.forEach((email, idx) => {
       output += `${idx + 1}. FROM: ${email.from}\n`;
       output += `   SUBJECT: ${email.subject}\n`;
-      output += `   DATE: ${email.date}\n\n`;
+      output += `   DATE: ${email.date}\n`;
+      output += `   LINK: ${email.link}\n\n`;
     });
   }
 
@@ -216,7 +219,8 @@ function generateDigest(date, internalDirect, internalMulti, externalDirect, ext
     internalMulti.forEach((email, idx) => {
       output += `${idx + 1}. FROM: ${email.from}\n`;
       output += `   SUBJECT: ${email.subject}\n`;
-      output += `   DATE: ${email.date}\n\n`;
+      output += `   DATE: ${email.date}\n`;
+      output += `   LINK: ${email.link}\n\n`;
     });
   }
 
@@ -234,7 +238,8 @@ function generateDigest(date, internalDirect, internalMulti, externalDirect, ext
     externalDirect.forEach((email, idx) => {
       output += `${idx + 1}. FROM: ${email.from}\n`;
       output += `   SUBJECT: ${email.subject}\n`;
-      output += `   DATE: ${email.date}\n\n`;
+      output += `   DATE: ${email.date}\n`;
+      output += `   LINK: ${email.link}\n\n`;
     });
   }
 
@@ -244,7 +249,8 @@ function generateDigest(date, internalDirect, internalMulti, externalDirect, ext
     externalMulti.forEach((email, idx) => {
       output += `${idx + 1}. FROM: ${email.from}\n`;
       output += `   SUBJECT: ${email.subject}\n`;
-      output += `   DATE: ${email.date}\n\n`;
+      output += `   DATE: ${email.date}\n`;
+      output += `   LINK: ${email.link}\n\n`;
     });
   }
 

@@ -8,6 +8,7 @@ This setup creates an automated daily email digest that:
 - 📧 Fetches your Gmail from the last 24 hours
 - 📊 Separates emails into **Internal** (your company domain) and **External**
 - 🎯 Prioritizes **Direct emails** (sent only to you) over multi-recipient emails
+- 🔗 Includes direct Gmail links to open each email
 - 💾 Saves a formatted digest file daily
 - ⏰ Runs automatically every morning at 8 AM
 
@@ -25,12 +26,14 @@ Daily Email Digest - 2026-03-24
 1. FROM: Boss <boss@company.com>
    SUBJECT: Important project update
    DATE: Today at 9:30am
+   LINK: https://mail.google.com/mail/u/0/#inbox/19d2116aede1fab9
 
 👥 Multi-Recipient
 ----------------------------------------
 1. FROM: Team Lead <lead@company.com>
    SUBJECT: Weekly team sync
    DATE: Today at 10am
+   LINK: https://mail.google.com/mail/u/0/#inbox/19d20d935970fc56
 
 📬 EXTERNAL EMAILS
 ======================================================================
@@ -273,6 +276,30 @@ cat ~/Claude/nanoclaw/Gmail/email-digest-$(date +%Y-%m-%d).txt
 ```bash
 cd ~/Claude/nanoclaw
 node email-digest.js
+```
+
+### Using Gmail Links
+
+Each email in the digest includes a direct link to open it in Gmail. You can:
+
+**1. Command+Click (macOS Terminal):**
+- Many terminal apps support clickable links
+- Hold Command and click the link
+
+**2. Copy-Paste:**
+- Select and copy the link
+- Paste into your browser
+
+**3. Open digest in browser:**
+```bash
+# Convert to HTML for clickable links
+open ~/Claude/nanoclaw/Gmail/email-digest-$(date +%Y-%m-%d).txt
+```
+
+**4. Use VS Code or other editor:**
+- Most modern editors make URLs clickable
+```bash
+code ~/Claude/nanoclaw/Gmail/email-digest-$(date +%Y-%m-%d).txt
 ```
 
 ### Change Schedule Time
