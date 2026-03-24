@@ -209,20 +209,21 @@ You should see:
 ```
 📧 Fetching emails from Gmail...
 📨 Processing X emails...
-✅ Digest saved to: email-digest-2026-03-24.txt
+✅ Digest saved to: /Users/[username]/Claude/nanoclaw/Gmail/email-digest-2026-03-24.txt
 📊 Internal: X, External: X
 ```
 
 View your first digest:
 ```bash
-cat email-digest-$(date +%Y-%m-%d).txt
+cat ~/Claude/nanoclaw/Gmail/email-digest-$(date +%Y-%m-%d).txt
 ```
 
 ### 10. Schedule Daily Execution
 
 ```bash
-# Create logs directory
+# Create logs and Gmail directories
 mkdir -p ~/Claude/nanoclaw/logs
+mkdir -p ~/Claude/nanoclaw/Gmail
 
 # Download the LaunchAgent plist
 curl -o ~/Library/LaunchAgents/com.nanoclaw.emaildigest.plist \
@@ -264,7 +265,7 @@ You should see:
 ### View Today's Digest
 
 ```bash
-cat ~/Claude/nanoclaw/email-digest-$(date +%Y-%m-%d).txt
+cat ~/Claude/nanoclaw/Gmail/email-digest-$(date +%Y-%m-%d).txt
 ```
 
 ### Run Manually Anytime

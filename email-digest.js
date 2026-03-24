@@ -10,7 +10,7 @@
  * 1. Direct emails (sent only to you)
  * 2. Multi-recipient emails (cc/bcc or lists)
  *
- * Output is saved to: email-digest-YYYY-MM-DD.txt
+ * Output is saved to: Gmail/email-digest-YYYY-MM-DD.txt
  */
 
 import { google } from 'googleapis';
@@ -23,7 +23,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Get today's date for filename
 const today = new Date().toISOString().split('T')[0];
-const outputFile = path.join(__dirname, `email-digest-${today}.txt`);
+const gmailDir = path.join(__dirname, 'Gmail');
+const outputFile = path.join(gmailDir, `email-digest-${today}.txt`);
 
 async function main() {
   try {
@@ -36,6 +37,11 @@ async function main() {
     if (!fs.existsSync(credentialsPath)) {
       console.error('❌ Gmail credentials not found. Please run Gmail authorization first.');
       process.exit(1);
+    }
+
+    // Ensure Gmail output directory exists
+    if (!fs.existsSync(gmailDir)) {
+      fs.mkdirSync(gmailDir, { recursive: true });
     }
 
     const credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf-8'));
