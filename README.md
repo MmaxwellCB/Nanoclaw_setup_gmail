@@ -8,6 +8,8 @@ This setup creates an automated daily email digest that:
 - 📧 Fetches your Gmail from the last 24 hours
 - 📊 Separates emails into **Internal** (your company domain) and **External**
 - 🎯 Prioritizes **Direct emails** (sent only to you) over multi-recipient emails
+- 🤖 **AI-powered summaries** - 1-2 sentence summary of each email using Claude
+- 🏷️ **Smart tags** - Auto-categorizes as [ACTION NEEDED], [FYI], [MEETING], [RESPONSE NEEDED]
 - 🔗 Includes direct Gmail links to open each email
 - 💾 Saves a formatted digest file daily
 - ⏰ Runs automatically every morning at 8 AM
@@ -23,15 +25,17 @@ Daily Email Digest - 2026-03-24
 
 🎯 Direct (Priority)
 ----------------------------------------
-1. FROM: Boss <boss@company.com>
+1. [ACTION NEEDED] FROM: Boss <boss@company.com>
    SUBJECT: Important project update
+   SUMMARY: Requires your review and approval on the Q2 roadmap by EOD Friday.
    DATE: Today at 9:30am
    LINK: https://mail.google.com/mail/u/0/#inbox/19d2116aede1fab9
 
 👥 Multi-Recipient
 ----------------------------------------
-1. FROM: Team Lead <lead@company.com>
+1. [MEETING] FROM: Team Lead <lead@company.com>
    SUBJECT: Weekly team sync
+   SUMMARY: Recurring weekly sync to discuss project status and blockers.
    DATE: Today at 10am
    LINK: https://mail.google.com/mail/u/0/#inbox/19d20d935970fc56
 
@@ -48,8 +52,44 @@ Before starting, ensure you have:
 - ✅ **Node.js 20+** (`node --version` to check)
 - ✅ **Docker Desktop** installed and running
 - ✅ **Anthropic API key** (get at https://console.anthropic.com/settings/keys)
+- ✅ **Anthropic API credits** (see [AI Summaries & Credits](#ai-summaries--credits) below)
 - ✅ **Google Cloud account** (free tier is fine)
 - ✅ **Git** installed
+
+## AI Summaries & Credits
+
+### How AI Summaries Work
+
+The email digest uses Claude AI (Anthropic API) to:
+- **Analyze each email** and generate a 1-2 sentence summary
+- **Categorize emails** with action tags: `[ACTION NEEDED]`, `[FYI]`, `[MEETING]`, `[RESPONSE NEEDED]`
+- **Save you time** - scan 50+ emails in 2 minutes instead of opening each one
+
+### Cost & Credits
+
+**Anthropic API credits required:** Yes
+
+- **Cost:** ~$0.003 per email (very low - about $0.15-0.20 per day for 50-70 emails)
+- **Monthly estimate:** ~$5-6 for daily digests
+- **Minimum purchase:** $5 gets you ~1,600+ email summaries
+
+**To add credits:**
+1. Go to https://console.anthropic.com/settings/billing
+2. Click "Add credits" or "Purchase credits"
+3. Add $5 (lasts ~1 month) or more
+
+### Fallback Mode (No Credits)
+
+If your API credits are low or expired, the script **still works** but uses fallback mode:
+- ✅ All emails are still fetched and organized
+- ✅ Gmail links still included
+- ✅ Tags default to `[FYI]`
+- ⚠️ **SUMMARY** field shows email subject instead of AI summary
+
+**You'll see:** `SUMMARY: Important project update` (just the subject)
+**With AI:** `SUMMARY: Requires your review and approval on the Q2 roadmap by EOD Friday.`
+
+The digest is still useful in fallback mode - you just don't get the time-saving AI summaries.
 
 ## Quick Start
 
@@ -365,6 +405,32 @@ Manually test:
 cd ~/Claude/nanoclaw
 node email-digest.js
 ```
+
+### AI summaries showing subject lines only
+
+**Symptom:** SUMMARY field just shows the email subject, not an AI-generated summary
+
+**Cause:** Anthropic API credits are low or expired
+
+**Solution:**
+1. Check your credit balance: https://console.anthropic.com/settings/billing
+2. Add credits (minimum $5)
+3. Run digest again:
+```bash
+cd ~/Claude/nanoclaw
+node email-digest.js
+```
+
+**Note:** The digest still works in fallback mode - you just get subject lines instead of AI summaries. Add credits when you want the full AI-powered experience.
+
+### AI summary errors in logs
+
+If you see errors like:
+```
+Error summarizing email: Your credit balance is too low
+```
+
+This is normal when credits are depleted. The script automatically falls back to subject lines and continues working. Simply add credits to your Anthropic account to re-enable AI summaries.
 
 ## Advanced: Switching to Slack/Telegram
 

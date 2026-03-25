@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Daily Email Digest Script
+ * Daily Email Digest Script with AI Summaries
  *
  * Fetches emails from Gmail, separates into:
  * 1. Internal emails (@cloudbees.com)
@@ -10,10 +10,15 @@
  * 1. Direct emails (sent only to you)
  * 2. Multi-recipient emails (cc/bcc or lists)
  *
+ * Uses Claude AI to generate:
+ * - 1-2 sentence summaries for each email
+ * - Action tags: [ACTION NEEDED], [FYI], [MEETING], [RESPONSE NEEDED]
+ *
  * Output is saved to: Gmail/email-digest-YYYY-MM-DD.txt
  */
 
 import { google } from 'googleapis';
+import Anthropic from '@anthropic-ai/sdk';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -25,6 +30,101 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const today = new Date().toISOString().split('T')[0];
 const gmailDir = path.join(__dirname, 'Gmail');
 const outputFile = path.join(gmailDir, `email-digest-${today}.txt`);
+
+// Load environment variables
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf-8');
+  envContent.split('\n').forEach(line => {
+    const [key, ...values] = line.split('=');
+    if (key && values.length) {
+      process.env[key.trim()] = values.join('=').trim();
+    }
+  });
+}
+
+// Initialize Anthropic client
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+/**
+ * Extract plain text body from Gmail message
+ */
+function getEmailBody(payload) {
+  let body = '';
+
+  // Check if there's a direct body
+  if (payload.body && payload.body.data) {
+    body = Buffer.from(payload.body.data, 'base64').toString('utf-8');
+  }
+
+  // Check multipart messages
+  if (payload.parts) {
+    for (const part of payload.parts) {
+      if (part.mimeType === 'text/plain' && part.body && part.body.data) {
+        body += Buffer.from(part.body.data, 'base64').toString('utf-8');
+      } else if (part.mimeType === 'text/html' && !body && part.body && part.body.data) {
+        // Fallback to HTML if no plain text
+        const html = Buffer.from(part.body.data, 'base64').toString('utf-8');
+        // Simple HTML strip (just remove tags)
+        body = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      } else if (part.parts) {
+        // Recursive for nested parts
+        body += getEmailBody(part);
+      }
+    }
+  }
+
+  // Limit body length to avoid huge API calls
+  return body.substring(0, 3000).trim();
+}
+
+/**
+ * Generate summary and action tag for an email using Claude
+ */
+async function summarizeEmail(email) {
+  try {
+    const prompt = `Analyze this email and provide:
+1. A 1-2 sentence summary
+2. An action tag: [ACTION NEEDED], [FYI], [MEETING], or [RESPONSE NEEDED]
+
+Email Details:
+FROM: ${email.from}
+SUBJECT: ${email.subject}
+BODY: ${email.body}
+
+Format your response as:
+TAG: [tag here]
+SUMMARY: summary here`;
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 150,
+      messages: [{
+        role: 'user',
+        content: prompt
+      }]
+    });
+
+    const response = message.content[0].text;
+
+    // Parse the response
+    const tagMatch = response.match(/TAG:\s*(\[.*?\])/);
+    const summaryMatch = response.match(/SUMMARY:\s*(.+?)$/s);
+
+    return {
+      tag: tagMatch ? tagMatch[1] : '[FYI]',
+      summary: summaryMatch ? summaryMatch[1].trim() : 'Email summary unavailable'
+    };
+  } catch (error) {
+    // Silently fall back to subject line if API unavailable
+    return {
+      tag: '[FYI]',
+      summary: email.subject
+    };
+  }
+}
 
 async function main() {
   try {
@@ -85,7 +185,8 @@ async function main() {
 
     // Fetch full details for each message
     const emails = [];
-    for (const message of messages) {
+    for (let i = 0; i < messages.length; i++) {
+      const message = messages[i];
       const msg = await gmail.users.messages.get({
         userId: 'me',
         id: message.id,
@@ -93,6 +194,8 @@ async function main() {
       });
 
       const headers = msg.data.payload.headers;
+      const body = getEmailBody(msg.data.payload);
+
       const email = {
         id: message.id,
         from: getHeader(headers, 'From'),
@@ -100,8 +203,21 @@ async function main() {
         cc: getHeader(headers, 'Cc'),
         subject: getHeader(headers, 'Subject'),
         date: getHeader(headers, 'Date'),
+        body: body,
         link: `https://mail.google.com/mail/u/0/#inbox/${message.id}`
       };
+
+      // Generate AI summary (skip if API unavailable)
+      console.log(`   Processing ${i + 1}/${messages.length}: ${email.from.substring(0, 30)}...`);
+      try {
+        const { tag, summary } = await summarizeEmail(email);
+        email.tag = tag;
+        email.summary = summary;
+      } catch (error) {
+        // Fallback if AI summary fails
+        email.tag = '[FYI]';
+        email.summary = email.subject; // Use subject as fallback
+      }
 
       emails.push(email);
     }
@@ -206,8 +322,9 @@ function generateDigest(date, internalDirect, internalMulti, externalDirect, ext
     output += '🎯 Direct (Priority)\n';
     output += '-'.repeat(40) + '\n';
     internalDirect.forEach((email, idx) => {
-      output += `${idx + 1}. FROM: ${email.from}\n`;
+      output += `${idx + 1}. ${email.tag} FROM: ${email.from}\n`;
       output += `   SUBJECT: ${email.subject}\n`;
+      output += `   SUMMARY: ${email.summary}\n`;
       output += `   DATE: ${email.date}\n`;
       output += `   LINK: ${email.link}\n\n`;
     });
@@ -217,8 +334,9 @@ function generateDigest(date, internalDirect, internalMulti, externalDirect, ext
     output += '👥 Multi-Recipient\n';
     output += '-'.repeat(40) + '\n';
     internalMulti.forEach((email, idx) => {
-      output += `${idx + 1}. FROM: ${email.from}\n`;
+      output += `${idx + 1}. ${email.tag} FROM: ${email.from}\n`;
       output += `   SUBJECT: ${email.subject}\n`;
+      output += `   SUMMARY: ${email.summary}\n`;
       output += `   DATE: ${email.date}\n`;
       output += `   LINK: ${email.link}\n\n`;
     });
@@ -236,8 +354,9 @@ function generateDigest(date, internalDirect, internalMulti, externalDirect, ext
     output += '🎯 Direct (Priority)\n';
     output += '-'.repeat(40) + '\n';
     externalDirect.forEach((email, idx) => {
-      output += `${idx + 1}. FROM: ${email.from}\n`;
+      output += `${idx + 1}. ${email.tag} FROM: ${email.from}\n`;
       output += `   SUBJECT: ${email.subject}\n`;
+      output += `   SUMMARY: ${email.summary}\n`;
       output += `   DATE: ${email.date}\n`;
       output += `   LINK: ${email.link}\n\n`;
     });
@@ -247,8 +366,9 @@ function generateDigest(date, internalDirect, internalMulti, externalDirect, ext
     output += '👥 Multi-Recipient/Lists\n';
     output += '-'.repeat(40) + '\n';
     externalMulti.forEach((email, idx) => {
-      output += `${idx + 1}. FROM: ${email.from}\n`;
+      output += `${idx + 1}. ${email.tag} FROM: ${email.from}\n`;
       output += `   SUBJECT: ${email.subject}\n`;
+      output += `   SUMMARY: ${email.summary}\n`;
       output += `   DATE: ${email.date}\n`;
       output += `   LINK: ${email.link}\n\n`;
     });
